@@ -26,7 +26,7 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center space-x-2">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-cosmic-purple to-nebula-pink glow-effect"></div>
+          <img src="/clubLogo.png" alt="DSC" className="w-7 h-7 sm:w-8 sm:h-8" />
           <span className="text-lg sm:text-xl font-bold text-white">DSC WoC</span>
         </div>
 
