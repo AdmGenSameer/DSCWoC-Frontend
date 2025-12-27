@@ -11,10 +11,7 @@ const getSupabaseClient = () => {
     logger.error('Missing Supabase environment variables for auth controller');
     return null;
   }
-  return createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  );
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 };
 
 /**
@@ -36,8 +33,8 @@ export const initiateGitHubAuth = async (req, res) => {
       provider: 'github',
       options: {
         redirectTo: `${process.env.CORS_ORIGIN}/auth/callback`,
-        scopes: 'read:user user:email'
-      }
+        scopes: 'read:user user:email',
+      },
     });
 
     if (error) {
@@ -93,7 +90,10 @@ export const handleGitHubCallback = async (req, res) => {
     logger.info(`Login attempt with intended role: ${intended_role || 'contributor'}`);
 
     // Get user from Supabase
-    const { data: { user: supabaseUser }, error: authError } = await supabase.auth.getUser(access_token);
+    const {
+      data: { user: supabaseUser },
+      error: authError,
+    } = await supabase.auth.getUser(access_token);
 
     if (authError || !supabaseUser) {
       logger.error('Supabase user fetch error:', authError);
@@ -122,7 +122,7 @@ export const handleGitHubCallback = async (req, res) => {
       user.fullName = fullName;
       user.avatar_url = avatarUrl;
       user.lastLogin = new Date();
-      
+
       // Check if user is trying to login as mentor but doesn't have mentor/admin role
       if (intended_role === 'mentor' && user.role === 'Contributor') {
         // User is trying to use mentor login but is only a contributor
@@ -130,10 +130,11 @@ export const handleGitHubCallback = async (req, res) => {
         logger.warn(`Contributor ${githubUsername} attempted to login via mentor portal`);
         return res.status(HTTP_STATUS.FORBIDDEN).json({
           status: 'error',
-          message: 'You are not authorized as a Mentor/Admin. Please use the "Continue with GitHub" button for contributor login.',
+          message:
+            'You are not authorized as a Mentor/Admin. Please use the "Continue with GitHub" button for contributor login.',
         });
       }
-      
+
       await user.save();
     } else {
       // Create new user
@@ -142,7 +143,7 @@ export const handleGitHubCallback = async (req, res) => {
         isNewMentorRequest = true;
         logger.info(`New user ${githubUsername} attempting mentor login - creating as contributor`);
       }
-      
+
       user = new User({
         github_id: githubId,
         github_username: githubUsername,
@@ -156,13 +157,14 @@ export const handleGitHubCallback = async (req, res) => {
 
       // Check for badges for new user
       await Badge.checkAndAwardBadges(user._id);
-      
+
       // If new user tried to use mentor login, inform them
       if (isNewMentorRequest) {
         await user.populate('badges');
         return res.status(HTTP_STATUS.OK).json({
           status: 'success',
-          message: 'Account created as Contributor. Contact an admin if you should have Mentor/Admin access.',
+          message:
+            'Account created as Contributor. Contact an admin if you should have Mentor/Admin access.',
           data: {
             user: {
               id: user._id,
@@ -180,7 +182,8 @@ export const handleGitHubCallback = async (req, res) => {
               refresh_token,
             },
             redirectUrl: '/dashboard',
-            mentorRequestNote: 'You used the Mentor/Admin login but your account was created as a Contributor. Please contact an administrator if you should have elevated privileges.',
+            mentorRequestNote:
+              'You used the Mentor/Admin login but your account was created as a Contributor. Please contact an administrator if you should have elevated privileges.',
           },
         });
       }
@@ -240,9 +243,7 @@ export const handleGitHubCallback = async (req, res) => {
  */
 export const getCurrentUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
-      .populate('badges')
-      .select('-__v');
+    const user = await User.findById(req.user._id).populate('badges').select('-__v');
 
     if (!user) {
       return res.status(HTTP_STATUS.NOT_FOUND).json({
@@ -251,24 +252,28 @@ export const getCurrentUser = async (req, res) => {
       });
     }
 
-    successResponse(res, {
-      user: {
-        id: user._id,
-        github_id: user.github_id,
-        github_username: user.github_username,
-        email: user.email,
-        fullName: user.fullName,
-        avatar_url: user.avatar_url,
-        bio: user.bio,
-        college: user.college,
-        yearOfStudy: user.yearOfStudy,
-        role: user.role,
-        stats: user.stats,
-        badges: user.badges,
-        createdAt: user.createdAt,
-        lastLogin: user.lastLogin,
+    successResponse(
+      res,
+      {
+        user: {
+          id: user._id,
+          github_id: user.github_id,
+          github_username: user.github_username,
+          email: user.email,
+          fullName: user.fullName,
+          avatar_url: user.avatar_url,
+          bio: user.bio,
+          college: user.college,
+          yearOfStudy: user.yearOfStudy,
+          role: user.role,
+          stats: user.stats,
+          badges: user.badges,
+          createdAt: user.createdAt,
+          lastLogin: user.lastLogin,
+        },
       },
-    }, 'User profile retrieved successfully');
+      'User profile retrieved successfully'
+    );
   } catch (error) {
     logger.error('Get current user error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
@@ -287,7 +292,7 @@ export const logout = async (req, res) => {
   try {
     // Supabase handles token invalidation on client side
     // We just need to confirm logout on server side
-    
+
     successResponse(res, null, 'Logged out successfully');
   } catch (error) {
     logger.error('Logout error:', error);
@@ -306,40 +311,44 @@ export const logout = async (req, res) => {
 export const refreshUserData = async (req, res) => {
   try {
     const user = req.user;
-    
+
     // Update user stats
     await user.updateStats();
-    
+
     // Check for new badges
     const newBadges = await Badge.checkAndAwardBadges(user._id);
-    
+
     // Get updated user data
     const updatedUser = await User.findById(user._id).populate('badges');
-    
-    successResponse(res, {
-      user: {
-        id: updatedUser._id,
-        github_id: updatedUser.github_id,
-        github_username: updatedUser.github_username,
-        email: updatedUser.email,
-        fullName: updatedUser.fullName,
-        avatar_url: updatedUser.avatar_url,
-        bio: updatedUser.bio,
-        college: updatedUser.college,
-        yearOfStudy: updatedUser.yearOfStudy,
-        role: updatedUser.role,
-        stats: updatedUser.stats,
-        badges: updatedUser.badges,
+
+    successResponse(
+      res,
+      {
+        user: {
+          id: updatedUser._id,
+          github_id: updatedUser.github_id,
+          github_username: updatedUser.github_username,
+          email: updatedUser.email,
+          fullName: updatedUser.fullName,
+          avatar_url: updatedUser.avatar_url,
+          bio: updatedUser.bio,
+          college: updatedUser.college,
+          yearOfStudy: updatedUser.yearOfStudy,
+          role: updatedUser.role,
+          stats: updatedUser.stats,
+          badges: updatedUser.badges,
+        },
+        newBadges: newBadges.map((badge) => ({
+          id: badge._id,
+          name: badge.name,
+          description: badge.description,
+          icon: badge.icon,
+          color: badge.color,
+          rarity: badge.rarity,
+        })),
       },
-      newBadges: newBadges.map(badge => ({
-        id: badge._id,
-        name: badge.name,
-        description: badge.description,
-        icon: badge.icon,
-        color: badge.color,
-        rarity: badge.rarity,
-      })),
-    }, 'User data refreshed successfully');
+      'User data refreshed successfully'
+    );
   } catch (error) {
     logger.error('Refresh user data error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
